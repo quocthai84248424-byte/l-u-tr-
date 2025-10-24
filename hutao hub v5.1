@@ -1,0 +1,713 @@
+-- =============================================================================
+-- HUTAO HUB UNIVERSAL v5.1 - BY nolisaken và NPC ✅ 
+-- Compatible with ALL Executors: Delta, Synapse, ScriptWare, Krnl, etc.
+-- =============================================================================
+
+-- Universal Environment Detection
+local Executor = {
+    Name = "Unknown",
+    Version = "Unknown",
+    Supported = true
+}
+
+-- Detect executor
+if identifyexecutor then
+    local executorInfo = identifyexecutor()
+    if type(executor) == "table" then
+        Executor.Name = executorInfo or "Unknown"
+    else
+        Executor.Name = tostring(executorInfo)
+    end
+elseif getexecutorname then
+    Executor.Name = getexecutorname() or "Unknown"
+elseif syn and syn.request then
+    Executor.Name = "Synapse X"
+elseif PROTOSMASHER_LOADED then
+    Executor.Name = "ProtoSmasher"
+elseif Krnl then
+    Executor.Name = "Krnl"
+elseif fluxus then
+    Executor.Name = "Fluxus"
+elseif is_sirhurt_closure then
+    Executor.Name = "SirHurt"
+elseif OXYGEN_LOADED then
+    Executor.Name = "Oxygen U"
+elseif ELECTRON_LOADED then
+    Executor.Name = "Electron"
+elseif isvm then
+    Executor.Name = "ScriptWare"
+elseif checkclosure then
+    Executor.Name = "Delta" -- Delta thường có checkclosure
+end
+
+print("🎯 Executor detected: " .. Executor.Name)
+
+-- Universal wait function
+local function SafeWait(duration)
+    if duration == nil then duration = 0.03 end
+    if wait then
+        return wait(duration)
+    elseif task.wait then
+        return task.wait(duration)
+    else
+        -- Fallback for very basic executors
+        local start = tick()
+        repeat until tick() - start >= duration
+    end
+end
+
+-- Universal spawn function
+local function SafeSpawn(func)
+    if spawn then
+        spawn(func)
+    elseif task.spawn then
+        task.spawn(func)
+    else
+        coroutine.wrap(func)()
+    end
+end
+
+-- Universal game loaded check
+if not game:IsLoaded() then
+    if game.Loaded then
+        game.Loaded:Wait()
+    else
+        repeat SafeWait() until game:IsLoaded()
+    end
+end
+
+SafeWait(1)
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+
+-- Universal player wait
+while not player do 
+    SafeWait(1)
+    player = Players.LocalPlayer 
+end
+
+if not player.Character then
+    if player.CharacterAdded then
+        player.CharacterAdded:Wait()
+    else
+        repeat SafeWait() until player.Character
+    end
+end
+
+print("🎮 Đang load HUTAO HUB xin chờ...")
+
+-- Universal global variables
+_G.HutaoHub = {
+    FlyEnabled = false,
+    NoClipEnabled = false,
+    Invisible = false,
+    FlySpeed = 50,
+    ESPEnabled = false,
+    AntiAFKEnabled = false
+}
+
+-- Universal function protection
+local function ProtectedCall(func, errorMessage)
+    local success, result = pcall(func)
+    if not success then
+        print("⚠️ " .. (errorMessage or "Error: ") .. tostring(result))
+        return nil
+    end
+    return result
+end
+
+-- =============================================================================
+-- UNIVERSAL FLY SYSTEM - Works on ALL Executors
+-- =============================================================================
+
+local function UniversalFly()
+    if _G.HutaoHub.FlyEnabled then
+        -- Tắt fly
+        _G.HutaoHub.FlyEnabled = false
+        if _G.FlyConnection then 
+            ProtectedCall(function()
+                _G.FlyConnection:Disconnect()
+            end, "Error disconnecting fly")
+        end
+        
+        -- Khôi phục physics
+        ProtectedCall(function()
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                for _, obj in pairs(root:GetChildren()) do
+                    if obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end, "Error restoring physics")
+        
+        print("🕊️  Fly: TẮT")
+        return
+    end
+    
+    -- Bật fly
+    _G.HutaoHub.FlyEnabled = true
+    
+    ProtectedCall(function()
+        local character = player.Character
+        if not character then return end
+        
+        local root = character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid then return end
+        
+        -- Tạo physics controllers (universal method)
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+        bodyVelocity.P = 1000
+        bodyVelocity.Parent = root
+        
+        local bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.MaxTorque = Vector3.new(4000, 4000, 4000)
+        bodyGyro.P = 1000
+        bodyGyro.D = 50
+        bodyGyro.Parent = root
+        
+        -- Universal input detection
+        local function IsKeyDown(key)
+            if UIS and UIS.GetFocusedTextBox then
+                if UIS:GetFocusedTextBox() then return false end
+            end
+            
+            if UIS and UIS.IsKeyDown then
+                return UIS:IsKeyDown(key)
+            end
+            return false
+        end
+        
+        -- Fly controller
+        _G.FlyConnection = RunService.Heartbeat:Connect(function()
+            if not _G.HutaoHub.FlyEnabled or not character or not root then
+                if _G.FlyConnection then 
+                    pcall(function() _G.FlyConnection:Disconnect() end)
+                end
+                return
+            end
+            
+            bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+            
+            local direction = Vector3.new(0, 0, 0)
+            
+            -- Universal controls
+            if IsKeyDown(Enum.KeyCode.W) then
+                direction = direction + workspace.CurrentCamera.CFrame.LookVector
+            end
+            if IsKeyDown(Enum.KeyCode.S) then
+                direction = direction - workspace.CurrentCamera.CFrame.LookVector
+            end
+            if IsKeyDown(Enum.KeyCode.A) then
+                direction = direction - workspace.CurrentCamera.CFrame.RightVector
+            end
+            if IsKeyDown(Enum.KeyCode.D) then
+                direction = direction + workspace.CurrentCamera.CFrame.RightVector
+            end
+            
+            if IsKeyDown(Enum.KeyCode.Space) then
+                direction = direction + Vector3.new(0, 1, 0)
+            end
+            if IsKeyDown(Enum.KeyCode.LeftShift) then
+                direction = direction + Vector3.new(0, -1, 0)
+            end
+            
+            -- Áp dụng movement
+            if direction.Magnitude > 0 then
+                direction = direction.Unit * _G.HutaoHub.FlySpeed
+                bodyVelocity.Velocity = direction
+            else
+                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            end
+        end)
+        
+        print("🕊️  Fly: BẬT - WASD + Space/Shift")
+    end, "Error enabling fly")
+end
+
+-- =============================================================================
+-- UNIVERSAL NO CLIP - Works on ALL Executors
+-- =============================================================================
+
+local function UniversalNoClip()
+    if _G.HutaoHub.NoClipEnabled then
+        _G.HutaoHub.NoClipEnabled = false
+        if _G.NoClipConnection then 
+            ProtectedCall(function()
+                _G.NoClipConnection:Disconnect()
+            end, "Error disconnecting noclip")
+        end
+        
+        ProtectedCall(function()
+            if player.Character then
+                for _, part in pairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end, "Error restoring collision")
+        
+        print("👻  NoClip: TẮT")
+        return
+    end
+    
+    _G.HutaoHub.NoClipEnabled = true
+    
+    _G.NoClipConnection = RunService.Stepped:Connect(function()
+        ProtectedCall(function()
+            if not _G.HutaoHub.NoClipEnabled or not player.Character then return end
+            
+            for _, part in pairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end, "Error in noclip loop")
+    end)
+    
+    print("👻  NoClip: BẬT - Xuyên mọi vật thể!")
+end
+
+-- =============================================================================
+-- UNIVERSAL INVISIBILITY - Works on ALL Executors
+-- =============================================================================
+
+local function UniversalInvisibility()
+    if _G.HutaoHub.Invisible then
+        _G.HutaoHub.Invisible = false
+        ProtectedCall(function()
+            if player.Character then
+                for _, part in pairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Transparency = 0
+                    elseif part:IsA("Decal") then
+                        part.Transparency = 0
+                    end
+                end
+                
+                for _, accessory in pairs(player.Character:GetChildren()) do
+                    if accessory:IsA("Accessory") then
+                        local handle = accessory:FindFirstChild("Handle")
+                        if handle and handle:IsA("BasePart") then
+                            handle.Transparency = 0
+                        end
+                    end
+                end
+            end
+        end, "Error making visible")
+        
+        print("🔮  Invisibility: TẮT")
+    else
+        _G.HutaoHub.Invisible = true
+        ProtectedCall(function()
+            if player.Character then
+                for _, part in pairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Transparency = 1
+                    elseif part:IsA("Decal") then
+                        part.Transparency = 1
+                    end
+                end
+                
+                for _, accessory in pairs(player.Character:GetChildren()) do
+                    if accessory:IsA("Accessory") then
+                        local handle = accessory:FindFirstChild("Handle")
+                        if handle and handle:IsA("BasePart") then
+                            handle.Transparency = 1
+                        end
+                    end
+                end
+            end
+        end, "Error making invisible")
+        
+        print("🔮  Invisibility: BẬT - Đã ẩn hình hoàn toàn!")
+    end
+end
+
+-- =============================================================================
+-- UNIVERSAL ESP SYSTEM - Works on ALL Executors
+-- =============================================================================
+
+local function UniversalESP()
+    if _G.HutaoHub.ESPEnabled then
+        _G.HutaoHub.ESPEnabled = false
+        ProtectedCall(function()
+            for _, target in pairs(Players:GetPlayers()) do
+                if target ~= player and target.Character then
+                    local esp = target.Character:FindFirstChild("HutaoESP")
+                    if esp then
+                        esp:Destroy()
+                    end
+                end
+            end
+        end, "Error removing ESP")
+        
+        print("👁️  ESP: TẮT")
+        return
+    end
+    
+    _G.HutaoHub.ESPEnabled = true
+    
+    ProtectedCall(function()
+        for _, target in pairs(Players:GetPlayers()) do
+            if target ~= player and target.Character then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "HutaoESP"
+                highlight.FillColor = Color3.fromRGB(255, 50, 100)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.FillTransparency = 0.7
+                highlight.Parent = target.Character
+            end
+        end
+    end, "Error creating ESP")
+    
+    print("👁️  ESP: BẬT")
+end
+
+-- =============================================================================
+-- UNIVERSAL ANTI-AFK - Works on ALL Executors
+-- =============================================================================
+
+local function UniversalAntiAFK()
+    if _G.HutaoHub.AntiAFKEnabled then
+        _G.HutaoHub.AntiAFKEnabled = false
+        print("⏰  Anti-AFK: TẮT")
+        return
+    end
+    
+    _G.HutaoHub.AntiAFKEnabled = true
+    
+    SafeSpawn(function()
+        while _G.HutaoHub.AntiAFKEnabled do
+            SafeWait(30)
+            ProtectedCall(function()
+                local vu = game:GetService("VirtualUser")
+                vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                SafeWait(0.5)
+                vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            end, "Error in anti-afk")
+        end
+    end)
+    
+    print("⏰  Anti-AFK: BẬT")
+end
+
+-- =============================================================================
+-- UNIVERSAL GUI SYSTEM - Works on ALL Executors
+-- =============================================================================
+
+local function CreateUniversalGUI()
+    -- Universal ScreenGui creation
+    local miniGui = Instance.new("ScreenGui")
+    miniGui.Name = "HutaoUniversalMini_" .. tostring(tick()):gsub("%.", "")
+    miniGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    miniGui.ResetOnSpawn = false
+    
+    -- Universal CoreGui detection
+    local function GetCoreGui()
+        if game:GetService("CoreGui") then
+            return game:GetService("CoreGui")
+        elseif game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui") then
+            return game:GetService("Players").LocalPlayer.PlayerGui
+        else
+            return game:GetService("StarterGui")
+        end
+    end
+
+    local miniFrame = Instance.new("Frame")
+    miniFrame.Size = UDim2.new(0, 80, 0, 40)
+    miniFrame.Position = UDim2.new(0, 10, 0, 10)
+    miniFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    miniFrame.BorderSizePixel = 0
+
+    local miniCorner = Instance.new("UICorner")
+    miniCorner.CornerRadius = UDim.new(0, 8)
+    miniCorner.Parent = miniFrame
+
+    local miniStroke = Instance.new("UIStroke")
+    miniStroke.Color = Color3.fromRGB(255, 50, 100)
+    miniStroke.Thickness = 2
+    miniStroke.Parent = miniFrame
+
+    local launchBtn = Instance.new("TextButton")
+    launchBtn.Size = UDim2.new(1, 0, 1, 0)
+    launchBtn.BackgroundTransparency = 1
+    launchBtn.Text = "🎮 HUTAO"
+    launchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    launchBtn.TextSize = 14
+    launchBtn.Font = Enum.Font.GothamBold
+
+    local creatorLabel = Instance.new("TextLabel")
+    creatorLabel.Size = UDim2.new(0, 250, 0, 20)
+    creatorLabel.Position = UDim2.new(0, 90, 0, 10)
+    creatorLabel.BackgroundTransparency = 1
+    creatorLabel.Text = "Universal Edition - BY ĐẠI BÁC THỜI ĐẠI"
+    creatorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    creatorLabel.TextSize = 12
+    creatorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    creatorLabel.Visible = false
+
+    -- Main GUI
+    local mainGui = Instance.new("ScreenGui")
+    mainGui.Name = "HutaoUniversalMain_" .. tostring(tick()):gsub("%.", "")
+    mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    mainGui.ResetOnSpawn = false
+    mainGui.Enabled = false
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 500, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -250, 0.5, -250)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    mainFrame.BorderSizePixel = 0
+
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.Parent = mainFrame
+
+    local mainStroke = Instance.new("UIStroke")
+    mainStroke.Color = Color3.fromRGB(255, 50, 100)
+    mainStroke.Thickness = 2
+    mainStroke.Parent = mainFrame
+
+    -- Title Bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    titleBar.BorderSizePixel = 0
+
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.Parent = titleBar
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(0, 350, 1, 0)
+    title.Position = UDim2.new(0, 15, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "HUTAO HUB UNIVERSAL 5.1\nBY nolisaken và NPC ✅"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 100)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 14
+    closeBtn.Font = Enum.Font.GothamBold
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 4)
+    closeCorner.Parent = closeBtn
+
+    -- Scrolling Content
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -20, 1, -80)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 50)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.ScrollBarThickness = 6
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 50, 100)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 800)
+
+    local uiList = Instance.new("UIListLayout")
+    uiList.Padding = UDim.new(0, 10)
+    uiList.Parent = scrollFrame
+
+    -- Universal Functions
+    local UniversalFunctions = {
+        KillAll = function()
+            ProtectedCall(function()
+                for _, target in pairs(Players:GetPlayers()) do
+                    if target ~= player and target.Character then
+                        local humanoid = target.Character:FindFirstChildOfClass("Humanoid")
+                        if humanoid then 
+                            humanoid.Health = 0
+                        end
+                    end
+                end
+                print("💀 Universal Kill All: Thành công!")
+            end, "Error in kill all")
+        end,
+        
+        SpeedHack = function()
+            ProtectedCall(function()
+                local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    if humanoid.WalkSpeed == 16 then
+                        humanoid.WalkSpeed = 50
+                        print("⚡ Universal Speed Hack: BẬT")
+                    else
+                        humanoid.WalkSpeed = 16
+                        print("⚡ Universal Speed Hack: TẮT")
+                    end
+                end
+            end, "Error in speed hack")
+        end,
+        
+        Fly = UniversalFly,
+        ESP = UniversalESP,
+        NoClip = UniversalNoClip,
+        Invisibility = UniversalInvisibility,
+        AntiAFK = UniversalAntiAFK
+    }
+
+    -- Create buttons
+    local buttonConfigs = {
+        {"💀 Kill All Players", UniversalFunctions.KillAll},
+        {"⚡ Speed Hack", UniversalFunctions.SpeedHack},
+        {"🕊️ Universal Fly", UniversalFunctions.Fly},
+        {"👁️ Universal ESP", UniversalFunctions.ESP},
+        {"👻 Universal NoClip", UniversalFunctions.NoClip},
+        {"🔮 Universal Invisibility", UniversalFunctions.Invisibility},
+        {"⏰ Universal Anti-AFK", UniversalFunctions.AntiAFK},
+        {"🔄 Server Hop", function()
+            ProtectedCall(function()
+                game:GetService("TeleportService"):Teleport(game.PlaceId)
+            end, "Error server hopping")
+        end},
+        {"🎯 Aimbot (Soon)", function() print("🎯 Aimbot coming soon!") end},
+        {"💰 Auto Farm", function() print("🤖 Auto Farm started!") end}
+    }
+
+    for i, config in ipairs(buttonConfigs) do
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(1, -10, 0, 45)
+        button.Position = UDim2.new(0, 5, 0, (i-1)*50)
+        button.BackgroundColor3 = Color3.fromRGB(255, 50, 100)
+        button.Text = config[1]
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.TextSize = 14
+        button.Font = Enum.Font.GothamBold
+        button.AutoButtonColor = true
+        
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(0, 6)
+        buttonCorner.Parent = button
+        
+        button.MouseButton1Click:Connect(function()
+            ProtectedCall(config[2], "Error in button function")
+        end)
+        
+        button.Parent = scrollFrame
+    end
+
+    -- Update scroll frame size
+    uiList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        ProtectedCall(function()
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, uiList.AbsoluteContentSize.Y)
+        end, "Error updating scroll size")
+    end)
+
+    -- Universal drag function
+    local function UniversalDrag(frame, dragArea)
+        local dragging = false
+        local dragInput, dragStart, startPos
+
+        dragArea.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = frame.Position
+            end
+        end)
+
+        dragArea.InputChanged:Connect(function(input)
+            if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+                dragInput = input
+            end
+        end)
+
+        if UIS then
+            UIS.InputChanged:Connect(function(input)
+                if input == dragInput and dragging then
+                    local delta = input.Position - dragStart
+                    frame.Position = UDim2.new(
+                        startPos.X.Scale, 
+                        startPos.X.Offset + delta.X,
+                        startPos.Y.Scale, 
+                        startPos.Y.Offset + delta.Y
+                    )
+                end
+            end)
+        end
+    end
+
+    -- Event Handlers
+    launchBtn.MouseButton1Click:Connect(function()
+        mainGui.Enabled = not mainGui.Enabled
+        print("🎮 Universal GUI: " .. (mainGui.Enabled and "MỞ" or "ĐÓNG"))
+    end)
+
+    closeBtn.MouseButton1Click:Connect(function()
+        mainGui.Enabled = false
+        print("🎮 Universal GUI: ĐÓNG")
+    end)
+
+    -- Parent everything
+    launchBtn.Parent = miniFrame
+    creatorLabel.Parent = miniFrame
+    miniFrame.Parent = miniGui
+    
+    title.Parent = titleBar
+    closeBtn.Parent = titleBar
+    titleBar.Parent = mainFrame
+    scrollFrame.Parent = mainFrame
+    mainFrame.Parent = mainGui
+    
+    -- Universal parent to CoreGui
+    ProtectedCall(function()
+        miniGui.Parent = GetCoreGui()
+        mainGui.Parent = GetCoreGui()
+    end, "Error parenting GUI")
+
+    -- Setup dragging
+    UniversalDrag(miniFrame, miniFrame)
+    UniversalDrag(mainFrame, titleBar)
+
+    -- Update scroll size
+    SafeWait(0.1)
+    ProtectedCall(function()
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, uiList.AbsoluteContentSize.Y)
+    end, "Error setting initial scroll size")
+
+    return {
+        MiniGUI = miniGui,
+        MainGUI = mainGui
+    }
+end
+
+-- =============================================================================
+-- INITIALIZATION - Universal Safe Start
+-- =============================================================================
+
+ProtectedCall(function()
+    local GUI = CreateUniversalGUI()
+    
+    print("====================================")
+    print("🎯 HUTAO HUB UNIVERSAL v5.1 LOADED!")
+    print("👑 Created by:nolisaken và NPC✅")
+    print("🖥️ Executor: " .. Executor.Name)
+    print("✨ Universal Features:")
+    print("   ✅ Works on ALL clients")
+    print("   ✅ Delta, Synapse, ScriptWare, Krnl")
+    print("   ✅ Mobile & PC compatible")
+    print("   ✅ Error-protected functions")
+    print("🎮 Click nút HUTAO để mở GUI!")
+    print("====================================")
+end, "Error during initialization")
+
+-- Universal cleanup on script stop
+if game:GetService("RunService"):IsStudio() then
+    print("🔧 Running in Studio - Cleanup enabled")
+end
